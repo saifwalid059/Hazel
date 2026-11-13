@@ -88,6 +88,13 @@ object GalleryPosts {
 
     fun isGallery(info: MediaInfo): Boolean = formatOf(info) != null
 
+    /**
+     * Whether a saved read of the post at [url] should not be trusted: one yt-dlp made that
+     * has nothing to download, as it makes for a picture post gallery-dl could not read.
+     */
+    fun isStalePost(url: String, cached: MediaInfo): Boolean =
+        isPostLink(url) && !isGallery(cached) && !cached.videoFormats.any { it.hasVideo && !it.isGeneric }
+
     /** How many files the post holds, as read when its card was made. */
     fun countOf(format: MediaFormat): Int = format.formatId.substringAfter(':', "").toIntOrNull() ?: 0
 

@@ -1100,7 +1100,11 @@ class DownloadViewModel : ViewModel() {
         // it does any work, so the cheapest read is the one that does not happen. This
         // holds across restarts as well: what the last read wrote is still on disk.
         // The chosen reader's own read first, then whichever reader read it last.
-        (InfoCache.metadataFor(url, source) ?: InfoCache.metadataFor(url))?.let { return listOf(it) }
+        // Hazel (Saif): except a post read before gallery-dl had its say (yt-dlp's card for a
+        // picture post, made while the sign-in was missing), which is read again.
+        (InfoCache.metadataFor(url, source) ?: InfoCache.metadataFor(url))
+            ?.takeUnless { com.hazel.android.download.gallery.GalleryPosts.isStalePost(url, it) }
+            ?.let { return listOf(it) }
         // An entry listed with its formats, as the items of one post are, was kept as read.
         fun cardFor(entry: LinkEntry) = InfoCache.metadataFor(entry.url) ?: MediaProbe.pendingFor(entry)
 
@@ -1251,7 +1255,10 @@ class DownloadViewModel : ViewModel() {
 
         // Hazel (Saif): a photo post is read again by gallery-dl, which made its card.
         var galleryRefusal: Exception? = null
-        if (fresh && com.hazel.android.download.gallery.GalleryPosts.isPostLink(url)) {
+        val post = com.hazel.android.download.gallery.GalleryPosts.isPostLink(url)
+        val cachedCard = InfoCache.metadataFor(url)
+        if (post && (fresh || cachedCard == null ||
+                com.hazel.android.download.gallery.GalleryPosts.isStalePost(url, cachedCard))) {
             try {
                 com.hazel.android.download.gallery.GalleryPosts.read(app, url, access)?.let {
                     InfoCache.put(url, it, rawJson = null)
