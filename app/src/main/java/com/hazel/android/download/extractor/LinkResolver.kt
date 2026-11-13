@@ -69,8 +69,17 @@ object LinkResolver {
         // Hazel (Saif): a post on a photo site is put to gallery-dl first, so the pictures
         // of a carousel are not lost to a reader that only sees its videos. A post with no
         // pictures in it comes back null and goes on to yt-dlp as before.
+        // Why gallery-dl turned the post down, shown in place of yt-dlp's "no video" when
+        // the post is pictures (Instagram asks for a sign-in, for one).
+        var galleryRefusal: Exception? = null
         if (GalleryPosts.isPostLink(url)) {
-            readAsGallery(url, access)?.let { return it }
+            try {
+                readAsGallery(url, access)?.let { return it }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                galleryRefusal = e
+            }
         }
 
         if (source == ListingSource.NEWPIPE && !access.hasCookies) {
@@ -96,17 +105,20 @@ object LinkResolver {
             // reports "no video" for a picture) is offered to gallery-dl. yt-dlp's own
             // message stands when gallery-dl finds no pictures either.
             if (e is CancellationException) throw e
+            galleryRefusal?.let { refusal ->
+                if (GalleryPosts.isNoVideoError(e.message)) throw refusal
+            }
             if (!GalleryPosts.supportsSite(url) || GalleryPosts.isPostLink(url)) throw e
-            readAsGallery(url, access) ?: throw e
+            runCatching { readAsGallery(url, access) }
+                .onFailure { if (it is CancellationException) throw it }
+                .getOrNull() ?: throw e
         }
     }
 
+    /** Throws gallery-dl's refusal; null when the link holds no pictures. */
     private suspend fun readAsGallery(url: String, access: SiteAccess): LinkContents? =
-        runCatching { GalleryPosts.read(HazelApp.instance, url, access) }
-            .onFailure { if (it is CancellationException) throw it }
-            .getOrNull()
-            ?.let { info ->
-                InfoCache.put(url, info, rawJson = null)
-                LinkContents.Single(info)
-            }
+        GalleryPosts.read(HazelApp.instance, url, access)?.let { info ->
+            InfoCache.put(url, info, rawJson = null)
+            LinkContents.Single(info)
+        }
 }

@@ -174,7 +174,7 @@ object GalleryPosts {
         }
 
         if (files.isEmpty()) {
-            error?.let { throw GalleryDlEngine.GalleryDlException("gallery-dl: $it") }
+            error?.let { throw GalleryDlEngine.GalleryDlException(explain(url, it)) }
             return@withContext null
         }
 
@@ -202,6 +202,29 @@ object GalleryPosts {
             audioFormats = emptyList(),
             requiresSignIn = access.hasCookies
         )
+    }
+
+    /**
+     * gallery-dl's refusal in words Hazel's error screen understands. A site that sent it to
+     * its login page wants cookies, and "sign in" is what brings up Hazel's sign-in offer.
+     */
+    private fun explain(url: String, reason: String): String {
+        val lower = reason.lowercase()
+        val wantsSignIn = "login" in lower || "log in" in lower || "logged in" in lower ||
+            "authenticat" in lower || "401" in lower || "403" in lower
+        if (!wantsSignIn) return "gallery-dl: $reason"
+        val site = hostOf(url).substringBefore('.').replaceFirstChar { it.uppercase() }.ifBlank { "This site" }
+        return "$site wants you to sign in before it shows this post's photos. " +
+            "Import your $site cookies (Cookies → Import), then try again.
+
+gallery-dl: $reason"
+    }
+
+    /** yt-dlp's answer to a post that is all pictures. */
+    fun isNoVideoError(message: String?): Boolean {
+        val lower = message?.lowercase() ?: return false
+        return "no video formats" in lower || "no video could be found" in lower ||
+            "there is no video" in lower || "no media found" in lower
     }
 
     private fun extensionOf(fileUrl: String, meta: JSONObject): String =

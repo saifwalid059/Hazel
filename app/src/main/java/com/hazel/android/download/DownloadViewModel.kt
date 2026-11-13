@@ -1250,15 +1250,42 @@ class DownloadViewModel : ViewModel() {
         val newPipeCan = reader == ListingSource.NEWPIPE && !access.hasCookies && NewPipeEngine.handlesStream(url)
 
         // Hazel (Saif): a photo post is read again by gallery-dl, which made its card.
+        var galleryRefusal: Exception? = null
         if (fresh && com.hazel.android.download.gallery.GalleryPosts.isPostLink(url)) {
-            runCatching { com.hazel.android.download.gallery.GalleryPosts.read(app, url, access) }
-                .onFailure { if (it is CancellationException) throw it }
-                .getOrNull()
-                ?.let {
+            try {
+                com.hazel.android.download.gallery.GalleryPosts.read(app, url, access)?.let {
                     InfoCache.put(url, it, rawJson = null)
                     return it
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                galleryRefusal = e
+            }
         }
+        if (galleryRefusal != null) {
+            // A picture post yt-dlp can only answer with "no video": gallery-dl's reason
+            // (a sign-in, usually) is the one worth showing.
+            return try {
+                readFormatsWithEngines(url, fresh, source, access, newPipeCan)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (com.hazel.android.download.gallery.GalleryPosts.isNoVideoError(e.message)) throw galleryRefusal
+                throw e
+            }
+        }
+        return readFormatsWithEngines(url, fresh, source, access, newPipeCan)
+    }
+
+    private suspend fun readFormatsWithEngines(
+        url: String,
+        fresh: Boolean,
+        source: ListingSource?,
+        access: SiteAccess,
+        newPipeCan: Boolean
+    ): MediaInfo? {
+        val app = HazelApp.instance
 
         if (fresh) {
             InfoCache.invalidate(url, if (newPipeCan) ListingSource.NEWPIPE else ListingSource.YT_DLP)
