@@ -185,7 +185,7 @@ object GalleryPosts {
         }
 
         if (files.isEmpty()) {
-            error?.let { throw GalleryDlEngine.GalleryDlException(explain(url, it) + sentWith(access)) }
+            error?.let { throw GalleryDlEngine.GalleryDlException(explain(url, it) + sentWith(context, url, access)) }
             return@withContext null
         }
 
@@ -234,8 +234,10 @@ object GalleryPosts {
      * values) and the browser identity, so a refusal despite a sign-in can be told apart
      * from a sign-in that never reached gallery-dl.
      */
-    private fun sentWith(access: SiteAccess): String {
-        val file = access.cookieFile ?: return "\n\nSent: no cookies"
+    private suspend fun sentWith(context: Context, url: String, access: SiteAccess): String {
+        val file = access.cookieFile ?: return "\n\nSent: no cookies (" +
+            runCatching { com.hazel.android.data.CookieRepository.explainNoAccess(context, url) }
+                .getOrElse { "unknown: ${it.message}" } + ")"
         val names = runCatching {
             file.readLines()
                 .map { it.trim() }

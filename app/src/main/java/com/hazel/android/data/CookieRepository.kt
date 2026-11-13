@@ -280,6 +280,24 @@ object CookieRepository {
     }
 
     /**
+     * Hazel (Saif): why [accessFor] found no sign-in for [url], for an error message. Names
+     * sites and counts only, never cookie values.
+     */
+    suspend fun explainNoAccess(context: Context, url: String): String {
+        val use = getUseCookies(context).first()
+        val site = siteKeyOf(hostOf(url))
+        val entries = getEntries(context).first()
+        val described = entries.joinToString("; ") { e ->
+            val own = siteKeyOf(hostOf(e.url))
+            val lines = e.content.lineSequence().count { isCookieLine(it) }
+            "url=" + e.url.take(40) + " site=" + own + " on=" + e.enabled + " lines=" + lines +
+                " covers=" + (site != null && covers(e, site))
+        }
+        return "use=" + use + " site=" + site + " host=" + hostOf(url) + " entries=" + entries.size +
+            (if (described.isNotEmpty()) " [" + described + "]" else "")
+    }
+
+    /**
      * Whether a fetch of any of [urls] goes out signed in, as [accessFor] would decide it,
      * without writing the cookie file. For screens that only need to say so: NewPipe sends
      * no cookies, so a site with a saved sign-in is always read by yt-dlp.
