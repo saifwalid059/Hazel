@@ -1266,7 +1266,7 @@ class DownloadViewModel : ViewModel() {
         if (galleryRefusal != null) {
             // A picture post yt-dlp can only answer with "no video": gallery-dl's reason
             // (a sign-in, usually) is the one worth showing.
-            return try {
+            val read = try {
                 readFormatsWithEngines(url, fresh, source, access, newPipeCan)
             } catch (e: CancellationException) {
                 throw e
@@ -1274,6 +1274,8 @@ class DownloadViewModel : ViewModel() {
                 if (com.hazel.android.download.gallery.GalleryPosts.isNoVideoError(e.message)) throw galleryRefusal
                 throw e
             }
+            if (read?.hasResolvedFormats != true) throw galleryRefusal
+            return read
         }
         return readFormatsWithEngines(url, fresh, source, access, newPipeCan)
     }

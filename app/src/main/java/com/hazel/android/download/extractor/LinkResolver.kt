@@ -99,8 +99,14 @@ object LinkResolver {
 
         // Silent universal fallback to yt-dlp binary engine
         return try {
-            MediaProbe.listContents(url, cacheDir, access, fetchMode, forceIpv4, processId)
+            MediaProbe.listContents(url, cacheDir, access, fetchMode, forceIpv4, processId).also { contents ->
+                // yt-dlp made a card it cannot download (a picture post): gallery-dl's
+                // reason for turning the post down says more than an empty card does.
+                val refusal = galleryRefusal
+                if (refusal != null && contents is LinkContents.Single && !contents.info.hasResolvedFormats) throw refusal
+            }
         } catch (e: Exception) {
+            if (e === galleryRefusal) throw e
             // Hazel (Saif): any other link on a photo site that yt-dlp cannot read (it
             // reports "no video" for a picture) is offered to gallery-dl. yt-dlp's own
             // message stands when gallery-dl finds no pictures either.

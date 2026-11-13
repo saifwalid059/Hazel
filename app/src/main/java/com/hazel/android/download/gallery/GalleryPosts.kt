@@ -143,14 +143,25 @@ object GalleryPosts {
         if (!GalleryDlEngine.isAvailable(context)) return@withContext null
 
         val args = commonArgs(url, access) + listOf("-j", PostItem.address(url))
-        val result = GalleryDlEngine.execute(context, args, "${PROBE_ID}_${LinkKey.digest(url)}")
+        val result = try {
+            GalleryDlEngine.execute(context, args, "${PROBE_ID}_${LinkKey.digest(url)}")
+        } catch (e: GalleryDlEngine.GalleryDlException) {
+            throw e
+        } catch (e: Exception) {
+            // Python itself would not start: the engine is missing, or the system refused.
+            throw GalleryDlEngine.GalleryDlException("gallery-dl could not start: ${e.javaClass.simpleName}: ${e.message}")
+        }
 
         val payload = result.out.substringAfter('[', "").let { if (it.isEmpty()) "" else "[$it" }
         val messages = runCatching { JSONArray(payload) }.getOrNull()
         if (messages == null) {
-            val reason = result.err.lineSequence().lastOrNull { it.isNotBlank() }
-            if (reason != null) throw GalleryDlEngine.GalleryDlException("gallery-dl: $reason")
-            return@withContext null
+            // No answer at all: Python or gallery-dl failed before reading the post. The end
+            // of what it printed, a traceback usually, is what says why.
+            val tail = result.err.lineSequence().filter { it.isNotBlank() }.toList().takeLast(6)
+            throw GalleryDlEngine.GalleryDlException(
+                "gallery-dl failed (exit ${result.exitCode})" +
+                    if (tail.isEmpty()) ", printing nothing" else ":\n" + tail.joinToString("\n")
+            )
         }
 
         var postInfo: JSONObject? = null
