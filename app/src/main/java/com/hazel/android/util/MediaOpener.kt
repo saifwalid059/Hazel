@@ -23,6 +23,16 @@ object MediaOpener {
      * When nothing on the device claims the type, the chooser is offered before giving up.
      */
     fun play(context: Context, fileUri: String, isVideo: Boolean) {
+        // Hazel (Saif): a saved post opens on all of its pictures, not only the first.
+        com.hazel.android.download.gallery.GallerySets.setFor(context, fileUri)?.let { files ->
+            com.hazel.android.download.gallery.PostViewerActivity.open(context, files)
+            return
+        }
+        playFile(context, fileUri, isVideo)
+    }
+
+    /** Opens the one file in the device's own app for its type. */
+    fun playFile(context: Context, fileUri: String, isVideo: Boolean) {
         if (fileUri.isBlank()) {
             Toast.makeText(
                 context,

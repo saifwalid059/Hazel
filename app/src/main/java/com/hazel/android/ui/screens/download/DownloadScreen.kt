@@ -67,6 +67,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material3.Icon
@@ -246,7 +247,16 @@ fun DownloadScreen(
     var heldInfo by remember { mutableStateOf<MediaInfo?>(null) }
     var propertiesEntry by remember { mutableStateOf<HistoryEntry?>(null) }
     // Starts a link straight in the large player, from the sheet or a held card.
-    val playLarge: (MediaInfo) -> Unit = { info ->
+    val playLarge: (MediaInfo) -> Unit = playLarge@{ info ->
+        // Hazel (Saif): a post of pictures is looked through rather than played.
+        if (com.hazel.android.download.gallery.GalleryPosts.isGallery(info)) {
+            com.hazel.android.download.gallery.PostViewerActivity.open(
+                context,
+                com.hazel.android.download.gallery.GalleryPosts.previewOf(info.url) ?: listOfNotNull(info.thumbnail),
+                info.title
+            )
+            return@playLarge
+        }
         sheetVisible = false
         playerFullscreen = false
         playingUrl = info.url
@@ -638,8 +648,12 @@ fun DownloadScreen(
                                     playerFullscreen = playerFullscreen,
                                     playerInCard = dock.place == PlayerPlace.CARD && !dock.docking,
                                     onPlay = {
-                                        playingUrl = info.url
-                                        dock.start(info.url)
+                                        if (com.hazel.android.download.gallery.GalleryPosts.isGallery(info)) {
+                                            playLarge(info)
+                                        } else {
+                                            playingUrl = info.url
+                                            dock.start(info.url)
+                                        }
                                     },
                                     onFullscreen = { playerFullscreen = true },
                                     onStopPlaying = { if (playingUrl == info.url) stopPlaying() },
@@ -1565,7 +1579,10 @@ private fun MediaCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        Icons.Filled.PlayArrow,
+                        // Hazel (Saif): a post of pictures opens to look through, not to play.
+                        if (com.hazel.android.download.gallery.GalleryPosts.isGallery(info)) {
+                            Icons.Filled.PhotoLibrary
+                        } else Icons.Filled.PlayArrow,
                         contentDescription = stringResource(R.string.player_play),
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(24.dp)

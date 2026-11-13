@@ -112,7 +112,9 @@ object DownloadNotificationHelper {
     private fun openFileIntent(context: Context, fileUri: Uri?, isVideo: Boolean): PendingIntent {
         if (fileUri == null) return launchPendingIntent(context, ROUTE_HISTORY)
 
-        val view = Intent(Intent.ACTION_VIEW).apply {
+        // Hazel (Saif): a saved post opens on all of its pictures.
+        val set = com.hazel.android.download.gallery.GallerySets.setFor(context, fileUri.toString())
+        val view = if (set != null) com.hazel.android.download.gallery.PostViewerActivity.intent(context, set) else Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(fileUri, com.hazel.android.util.MediaOpener.typeOf(context, fileUri.toString(), isVideo))
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

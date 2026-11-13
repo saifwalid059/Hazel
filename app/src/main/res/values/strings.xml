@@ -151,6 +151,7 @@
     <string name="format_sheet_download">Download</string>
     <string name="format_sheet_tab_audio">Audio</string>
     <string name="format_sheet_tab_video">Video</string>
+    <string name="format_sheet_tab_photos">Photos</string>
     <string name="format_sheet_label_title">Title</string>
     <string name="format_sheet_label_author">Author</string>
     <string name="format_sheet_label_container">Container</string>

@@ -43,7 +43,9 @@ object MediaStoreHelper {
         isMusic: Boolean = false,
         onMoved: (Uri) -> Unit = {}
     ): File {
-        val files = tempDir.listFiles()?.filter { it.isFile } ?: return tempDir
+        // In the order they arrived, which for a post is the order it shows them in.
+        val files = tempDir.listFiles()?.filter { it.isFile }
+            ?.sortedWith(compareBy<File>({ it.lastModified() }, { it.name })) ?: return tempDir
 
         var leftBehind = false
         for (file in files) {
@@ -256,7 +258,8 @@ object MediaStoreHelper {
         treeUri: Uri,
         onMoved: (Uri) -> Unit = {}
     ): Boolean {
-        val files = tempDir.listFiles()?.filter { it.isFile } ?: return true
+        val files = tempDir.listFiles()?.filter { it.isFile }
+            ?.sortedWith(compareBy<File>({ it.lastModified() }, { it.name })) ?: return true
         val resolver = context.contentResolver
         val parent = folderDocument(treeUri)
 

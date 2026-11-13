@@ -467,14 +467,17 @@ fun FormatSheet(
                     modifier = Modifier.offset(x = -SHEET_TAB_PADDING),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    SheetTab(
+                    // Hazel (Saif): a post of pictures has no sound to take, and its one
+                    // tab is named for what it holds.
+                    val photoPost = com.hazel.android.download.gallery.GalleryPosts.isGallery(info)
+                    if (!photoPost) SheetTab(
                         label = stringResource(R.string.format_sheet_tab_audio),
                         selected = !videoTab,
                         enabled = info.audioFormats.isNotEmpty(),
                         onClick = { videoTab = false }
                     )
                     SheetTab(
-                        label = stringResource(R.string.format_sheet_tab_video),
+                        label = stringResource(if (photoPost) R.string.format_sheet_tab_photos else R.string.format_sheet_tab_video),
                         selected = videoTab,
                         enabled = info.videoFormats.isNotEmpty(),
                         onClick = { videoTab = true }

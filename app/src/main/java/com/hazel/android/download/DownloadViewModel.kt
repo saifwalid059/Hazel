@@ -2909,7 +2909,8 @@ class DownloadViewModel : ViewModel() {
             eta = "",
             status = "Fetching $total file${if (total == 1) "" else "s"}"
         ) }
-        com.hazel.android.download.gallery.GalleryPosts.download(
+        galleryResult = null
+        val saved = com.hazel.android.download.gallery.GalleryPosts.download(
             app, plan.info.url, downloadDir, access, processId
         ) { done ->
             val shown = done.coerceAtMost(total)
@@ -2927,7 +2928,11 @@ class DownloadViewModel : ViewModel() {
                 )
             }
         }
+        galleryResult = saved to total
     }
+
+    /** Hazel (Saif): how many files the last post saved, of how many it held. */
+    private var galleryResult: Pair<Int, Int>? = null
 
     private fun executeYtDlp(request: YoutubeDLRequest) {
         lastNotifiedAt = 0L
@@ -3031,11 +3036,15 @@ class DownloadViewModel : ViewModel() {
 
         // The saved file's address is kept so the completion notification can open it.
         var savedUri: android.net.Uri? = null
+        // Hazel (Saif): every file of a post, in order; the entry names the first of them.
+        val savedFiles = mutableListOf<String>()
+        val onSaved: (android.net.Uri) -> Unit = { uri ->
+            if (!isGalleryPost || savedUri == null) savedUri = uri
+            savedFiles += uri.toString()
+        }
 
         val movedToTree = tree != null && try {
-            com.hazel.android.util.MediaStoreHelper.moveToTree(context, downloadDir, tree) {
-                savedUri = it
-            }
+            com.hazel.android.util.MediaStoreHelper.moveToTree(context, downloadDir, tree, onSaved)
         } catch (_: Exception) {
             false
         }
@@ -3051,8 +3060,9 @@ class DownloadViewModel : ViewModel() {
             finalDir = try {
                 com.hazel.android.util.MediaStoreHelper.moveToPublicStorage(
                     context, downloadDir, StoragePaths.downloadRelativePath(isAudio = isMusic),
-                    isMusic = isMusic
-                ) { savedUri = it }
+                    isMusic = isMusic,
+                    onMoved = onSaved
+                )
             } catch (_: Exception) {
                 // MediaStore move failed; the files stay in app storage and remain accessible.
                 downloadDir
@@ -3085,11 +3095,17 @@ class DownloadViewModel : ViewModel() {
             savedPath = savedPath
         ) }
 
+        if (isGalleryPost) com.hazel.android.download.gallery.GallerySets.save(context, savedFiles)
+        // Hazel (Saif): a post that came down short says so, rather than passing as whole.
+        val shortfall = galleryResult?.takeIf { isGalleryPost && it.first < it.second }
+        galleryResult = null
+
         // The media's own title heads the completion notification rather than the file
         // name, which carries the template's separators and the container extension.
         DownloadNotificationHelper.showComplete(
             context,
-            title = (_state.value.active ?: _state.value.info)?.title.orEmpty().ifBlank { fileName },
+            title = (_state.value.active ?: _state.value.info)?.title.orEmpty().ifBlank { fileName }
+                .let { t -> shortfall?.let { (got, of) -> "$t (only $got of $of saved)" } ?: t },
             isVideo = plan.format.hasVideo,
             fileUri = savedUri
         )

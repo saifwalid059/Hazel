@@ -166,6 +166,13 @@
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
             android:theme="@style/Theme.Hazel" />
 
+        <!-- Hazel (Saif): the pictures of a post, one page each -->
+        <activity
+            android:name=".download.gallery.PostViewerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:theme="@style/Theme.Hazel" />
+
         <!-- FileProvider for opening downloaded files -->
         <provider
             android:name="androidx.core.content.FileProvider"

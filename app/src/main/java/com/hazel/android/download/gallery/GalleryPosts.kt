@@ -34,6 +34,12 @@ object GalleryPosts {
 
     private val IMAGE_EXTS = setOf("jpg", "jpeg", "png", "webp", "gif", "heic", "heif", "avif", "bmp")
 
+    /** The addresses of each post's files as last read, for looking before downloading. */
+    private val previews = java.util.concurrent.ConcurrentHashMap<String, List<String>>()
+
+    /** What [read] found in the post at [url], or null if it has not been read here. */
+    fun previewOf(url: String): List<String>? = previews[url]
+
     // ── Which links ──
 
     private fun hostOf(url: String): String =
@@ -198,6 +204,7 @@ object GalleryPosts {
 
         val images = files.filter { (fileUrl, meta) -> extensionOf(fileUrl, meta) in IMAGE_EXTS }
         if (images.isEmpty()) return@withContext null
+        previews[url] = files.map { it.first }
         val videos = files.size - images.size
 
         val meta = postInfo ?: files.first().second
@@ -280,8 +287,8 @@ object GalleryPosts {
     // ── Downloading ──
 
     /**
-     * Downloads every file of the post at [url] into [dir]. [onFile] is told how many files
-     * have arrived so far. Files already in [dir] are skipped, which is what makes a resume
+     * Downloads every file of the post at [url] into [dir] and returns how many were saved.
+     * [onFile] is told how many files have arrived so far. Files already in [dir] are skipped, which is what makes a resume
      * after a pause carry on rather than start again.
      */
     fun download(
@@ -291,7 +298,7 @@ object GalleryPosts {
         access: SiteAccess,
         processId: String,
         onFile: (Int) -> Unit
-    ) {
+    ): Int {
         dir.mkdirs()
         var done = 0
         val args = commonArgs(url, access) + listOf(
@@ -315,5 +322,6 @@ object GalleryPosts {
         if (result.exitCode != 0) {
             Log.w(TAG, "Post partly downloaded: $saved files, exit ${result.exitCode}")
         }
+        return saved
     }
 }
