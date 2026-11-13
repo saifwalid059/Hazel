@@ -185,7 +185,7 @@ object GalleryPosts {
         }
 
         if (files.isEmpty()) {
-            error?.let { throw GalleryDlEngine.GalleryDlException(explain(url, it)) }
+            error?.let { throw GalleryDlEngine.GalleryDlException(explain(url, it) + sentWith(access)) }
             return@withContext null
         }
 
@@ -227,6 +227,23 @@ object GalleryPosts {
         val site = hostOf(url).substringBefore('.').replaceFirstChar { it.uppercase() }.ifBlank { "This site" }
         return "$site wants you to sign in before it shows this post's photos. " +
             "Import your $site cookies (Cookies → Import), then try again.\n\ngallery-dl: $reason"
+    }
+
+    /**
+     * What the run was given to sign in with: the names of the cookies sent (never their
+     * values) and the browser identity, so a refusal despite a sign-in can be told apart
+     * from a sign-in that never reached gallery-dl.
+     */
+    private fun sentWith(access: SiteAccess): String {
+        val file = access.cookieFile ?: return "\n\nSent: no cookies"
+        val names = runCatching {
+            file.readLines()
+                .map { it.trim() }
+                .filter { it.isNotBlank() && (!it.startsWith("#") || it.startsWith("#HttpOnly_")) }
+                .map { line -> line.split('\t').let { f -> "${f.getOrNull(0)}:${f.getOrNull(5)}(${f.size})" } }
+        }.getOrElse { listOf("unreadable: ${it.message}") }
+        val agent = access.userAgent.ifBlank { "default" }.take(80)
+        return "\n\nSent: ${names.size} cookies " + names.joinToString(", ") + "\nAgent: $agent"
     }
 
     /** yt-dlp's answer to a post that is all pictures. */
