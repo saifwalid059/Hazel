@@ -215,9 +215,7 @@ object GalleryPosts {
         if (!wantsSignIn) return "gallery-dl: $reason"
         val site = hostOf(url).substringBefore('.').replaceFirstChar { it.uppercase() }.ifBlank { "This site" }
         return "$site wants you to sign in before it shows this post's photos. " +
-            "Import your $site cookies (Cookies → Import), then try again.
-
-gallery-dl: $reason"
+            "Import your $site cookies (Cookies → Import), then try again.\n\ngallery-dl: $reason"
     }
 
     /** yt-dlp's answer to a post that is all pictures. */
