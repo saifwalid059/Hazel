@@ -89,6 +89,12 @@ object StoragePaths {
     fun downloadsDisplay(isAudio: Boolean): String =
         if (isAudio) DOWNLOADS_AUDIO_DISPLAY else DOWNLOADS_VIDEO_DISPLAY
 
+    /**
+     * Hazel (Saif): where the pictures of a photo post land, through MediaStore.Images, so
+     * the gallery shows them as a "Hazel" album. Videos of the same post keep the video folder.
+     */
+    const val PICTURES_RELATIVE_PATH = "Pictures/Hazel"
+
     /** Relative path for MediaStore.Audio: "Music/Hazel" */
     const val MUSIC_RELATIVE_PATH = "Music/Hazel"
 

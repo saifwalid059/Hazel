@@ -138,7 +138,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.hazel.android"
+        applicationId = "com.hazel.android.saif"
         minSdk = 24
         targetSdk = 35
 

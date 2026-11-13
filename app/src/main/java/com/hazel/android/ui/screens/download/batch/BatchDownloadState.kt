@@ -152,8 +152,10 @@ class BatchDownloadState {
         isVideo: Boolean,
         language: String? = languageOf(info)
     ): MediaFormat? =
-        if (isVideo) info.autoPick(true, maxHeight, language, videoCodec = videoCodec)
-        else BatchAudioFormats.pick(info, audioChoice, language)
+        // Hazel (Saif): a photo post downloads whole from either tab.
+        com.hazel.android.download.gallery.GalleryPosts.formatOf(info)
+            ?: if (isVideo) info.autoPick(true, maxHeight, language, videoCodec = videoCodec)
+            else BatchAudioFormats.pick(info, audioChoice, language)
 
     /** The soundtrack a link will actually download with. */
     fun languageOf(info: MediaInfo): String? =

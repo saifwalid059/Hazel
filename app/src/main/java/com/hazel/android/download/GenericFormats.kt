@@ -93,6 +93,9 @@ object GenericFormats {
         videoCodec: VideoCodec? = null,
         audioCodec: AudioCodec? = null
     ): MediaFormat? = when {
+        // Hazel (Saif): a photo post has one choice, the whole post.
+        com.hazel.android.download.gallery.GalleryPosts.isGallery(info) ->
+            com.hazel.android.download.gallery.GalleryPosts.formatOf(info)
         !choice.isGeneric ->
             (info.videoFormats + info.audioFormats).firstOrNull { it.formatId == choice.formatId } ?: choice
         choice.hasVideo -> when (choice.formatId) {

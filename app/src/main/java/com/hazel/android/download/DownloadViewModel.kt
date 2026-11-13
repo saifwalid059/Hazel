@@ -1249,6 +1249,17 @@ class DownloadViewModel : ViewModel() {
         val access = CookieRepository.accessFor(app, url)
         val newPipeCan = reader == ListingSource.NEWPIPE && !access.hasCookies && NewPipeEngine.handlesStream(url)
 
+        // Hazel (Saif): a photo post is read again by gallery-dl, which made its card.
+        if (fresh && com.hazel.android.download.gallery.GalleryPosts.isPostLink(url)) {
+            runCatching { com.hazel.android.download.gallery.GalleryPosts.read(app, url, access) }
+                .onFailure { if (it is CancellationException) throw it }
+                .getOrNull()
+                ?.let {
+                    InfoCache.put(url, it, rawJson = null)
+                    return it
+                }
+        }
+
         if (fresh) {
             InfoCache.invalidate(url, if (newPipeCan) ListingSource.NEWPIPE else ListingSource.YT_DLP)
         } else {
@@ -1655,7 +1666,10 @@ class DownloadViewModel : ViewModel() {
                         break
                     }
 
-                    try {
+                    if (com.hazel.android.download.gallery.GalleryPosts.isGallery(plan.format)) {
+                        // Hazel (Saif): every file of a photo post, through gallery-dl.
+                        executeGalleryDl(app, plan, planAccess)
+                    } else try {
                         executeYtDlp(
                             buildRequest(
                                 plan.info.url, plan.format, options, plan.title, plan.author,
@@ -2060,6 +2074,7 @@ class DownloadViewModel : ViewModel() {
             viewModelScope.launch(Dispatchers.IO) {
                 try {
                     YoutubeDL.getInstance().destroyProcessById(processId)
+                com.hazel.android.download.gallery.GalleryDlEngine.destroy(processId)
                 } catch (_: Exception) { /* process may already be done */ }
             }
         } else {
@@ -2126,6 +2141,7 @@ class DownloadViewModel : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 YoutubeDL.getInstance().destroyProcessById(processId)
+                com.hazel.android.download.gallery.GalleryDlEngine.destroy(processId)
             } catch (_: Exception) { /* process may already be done */ }
         }
     }
@@ -2148,6 +2164,7 @@ class DownloadViewModel : ViewModel() {
         downloadScope.launch {
             try {
                 YoutubeDL.getInstance().destroyProcessById(processId)
+                com.hazel.android.download.gallery.GalleryDlEngine.destroy(processId)
             } catch (_: Exception) { /* process may already be done */ }
         }
     }
@@ -2257,6 +2274,7 @@ class DownloadViewModel : ViewModel() {
             withContext(Dispatchers.IO) {
                 try {
                     YoutubeDL.getInstance().destroyProcessById(processId)
+                com.hazel.android.download.gallery.GalleryDlEngine.destroy(processId)
                 } catch (_: Exception) { /* finished meanwhile: it is taken again all the same */ }
             }
         } else {
@@ -2841,6 +2859,40 @@ class DownloadViewModel : ViewModel() {
         return out.toString().trim().ifBlank { "download" }
     }
 
+    /**
+     * Hazel (Saif): downloads every file of a photo post into [downloadDir] with gallery-dl.
+     * Progress is counted in files, since gallery-dl reports a file only once it is written.
+     */
+    private fun executeGalleryDl(app: Context, plan: DownloadPlan, access: SiteAccess) {
+        lastNotifiedAt = 0L
+        val total = com.hazel.android.download.gallery.GalleryPosts.countOf(plan.format).coerceAtLeast(1)
+        _state.update { s -> s.copy(
+            processingSteps = emptyList(),
+            processingStep = 0,
+            isProcessing = false,
+            eta = "",
+            status = "Fetching $total file${if (total == 1) "" else "s"}"
+        ) }
+        com.hazel.android.download.gallery.GalleryPosts.download(
+            app, plan.info.url, downloadDir, access, processId
+        ) { done ->
+            val shown = done.coerceAtMost(total)
+            val status = "File $shown of $total"
+            val fraction = (shown.toFloat() / total).coerceIn(0f, 1f)
+            _state.update { s -> s.copy(progress = maxOf(s.progress, fraction), status = status) }
+            val now = System.currentTimeMillis()
+            if (now - lastNotifiedAt >= NOTIFICATION_INTERVAL_MS) {
+                lastNotifiedAt = now
+                DownloadNotificationHelper.showProgress(
+                    context = app,
+                    progress = (fraction * 100f).toInt(),
+                    statusLine = status,
+                    mediaTitle = plan.title
+                )
+            }
+        }
+    }
+
     private fun executeYtDlp(request: YoutubeDLRequest) {
         lastNotifiedAt = 0L
         val steps = plannedSteps
@@ -2926,7 +2978,10 @@ class DownloadViewModel : ViewModel() {
         // reported whichever of them finished last, which is a fraction of the real file.
         // Read here, before the move, because afterwards it is a content URI rather than a
         // file and its length is no longer a question with a cheap answer.
-        val finalSizeBytes = latestFile?.length()?.takeIf { it > 0 } ?: _state.value.totalBytes
+        val isGalleryPost = com.hazel.android.download.gallery.GalleryPosts.isGallery(plan.format)
+        val finalSizeBytes = if (isGalleryPost) {
+            downloadDir.listFiles()?.filter { it.isFile }?.sumOf { it.length() } ?: 0L
+        } else latestFile?.length()?.takeIf { it > 0 } ?: _state.value.totalBytes
 
         _state.update { s -> s.copy(
             status = "Saving",
@@ -2966,7 +3021,8 @@ class DownloadViewModel : ViewModel() {
                 // MediaStore move failed; the files stay in app storage and remain accessible.
                 downloadDir
             }
-            savedPath = StoragePaths.downloadsDisplay(isAudio = isMusic)
+            savedPath = if (isGalleryPost) StoragePaths.PICTURES_RELATIVE_PATH
+            else StoragePaths.downloadsDisplay(isAudio = isMusic)
 
             // The picked folder refused the file. It was kept rather than lost, and the
             // user is told where, once per run however many downloads it happened to.

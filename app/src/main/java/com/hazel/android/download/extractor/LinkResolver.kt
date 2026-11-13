@@ -1,13 +1,16 @@
 package com.hazel.android.download.extractor
 
 import androidx.annotation.StringRes
+import com.hazel.android.HazelApp
 import com.hazel.android.R
 import com.hazel.android.download.FetchMode
 import com.hazel.android.download.InfoCache
 import com.hazel.android.download.MediaProbe
 import com.hazel.android.download.SiteAccess
+import com.hazel.android.download.gallery.GalleryPosts
 import com.hazel.android.download.extractor.newpipe.NewPipeEngine
 import java.io.File
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Which extractor is asked what a link holds.
@@ -63,6 +66,13 @@ object LinkResolver {
         processId: String = MediaProbe.PROBE_PROCESS_ID
     ): LinkContents {
 
+        // Hazel (Saif): a post on a photo site is put to gallery-dl first, so the pictures
+        // of a carousel are not lost to a reader that only sees its videos. A post with no
+        // pictures in it comes back null and goes on to yt-dlp as before.
+        if (GalleryPosts.isPostLink(url)) {
+            readAsGallery(url, access)?.let { return it }
+        }
+
         if (source == ListingSource.NEWPIPE && !access.hasCookies) {
             // First check collections (playlists & channel tabs) for low-latency listing
             if (NewPipeEngine.handlesCollection(url)) {
@@ -79,6 +89,24 @@ object LinkResolver {
         }
 
         // Silent universal fallback to yt-dlp binary engine
-        return MediaProbe.listContents(url, cacheDir, access, fetchMode, forceIpv4, processId)
+        return try {
+            MediaProbe.listContents(url, cacheDir, access, fetchMode, forceIpv4, processId)
+        } catch (e: Exception) {
+            // Hazel (Saif): any other link on a photo site that yt-dlp cannot read (it
+            // reports "no video" for a picture) is offered to gallery-dl. yt-dlp's own
+            // message stands when gallery-dl finds no pictures either.
+            if (e is CancellationException) throw e
+            if (!GalleryPosts.supportsSite(url) || GalleryPosts.isPostLink(url)) throw e
+            readAsGallery(url, access) ?: throw e
+        }
     }
+
+    private suspend fun readAsGallery(url: String, access: SiteAccess): LinkContents? =
+        runCatching { GalleryPosts.read(HazelApp.instance, url, access) }
+            .onFailure { if (it is CancellationException) throw it }
+            .getOrNull()
+            ?.let { info ->
+                InfoCache.put(url, info, rawJson = null)
+                LinkContents.Single(info)
+            }
 }

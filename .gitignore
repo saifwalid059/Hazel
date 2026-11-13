@@ -72,3 +72,6 @@ main.tf
 pages/hazel-pages/_build/
 
 __pycache__/
+
+# ── Hazel (Saif): gallery-dl zipapp, built by CI (tools/saif/build_gallery_dl.sh) ──
+app/src/main/assets/gallery-dl.pyz

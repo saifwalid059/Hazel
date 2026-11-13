@@ -47,7 +47,9 @@ object MediaStoreHelper {
 
         var leftBehind = false
         for (file in files) {
-            val moved = movedUri(context, file, relativePath, isMusic)
+            // Hazel (Saif): a picture goes to Pictures/Hazel wherever the rest is headed.
+            val target = if (!isMusic && isImage(file)) StoragePaths.PICTURES_RELATIVE_PATH else relativePath
+            val moved = movedUri(context, file, target, isMusic)
             if (moved != null) {
                 onMoved(moved)
                 continue
@@ -137,6 +139,8 @@ object MediaStoreHelper {
 
         val collection = if (relativePath.startsWith("Music/") && Build.VERSION.SDK_INT >= 30) {
             MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        } else if (relativePath.startsWith("Pictures/") && Build.VERSION.SDK_INT >= 29) {
+            MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
         } else if (Build.VERSION.SDK_INT >= 29) {
             MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
         } else {
@@ -336,6 +340,8 @@ object MediaStoreHelper {
         MediaScannerConnection.scanFile(context, paths, mimeTypes, null)
     }
 
+    private fun isImage(file: File): Boolean = getMimeType(file).startsWith("image/")
+
     private fun getMimeType(file: File): String {
         return when (file.extension.lowercase()) {
             "mp3" -> "audio/mpeg"
@@ -349,6 +355,15 @@ object MediaStoreHelper {
             "webm" -> "video/webm"
             "3gp" -> "video/3gpp"
             "json" -> "application/json"
+            "jpg", "jpeg" -> "image/jpeg"
+            "png" -> "image/png"
+            "webp" -> "image/webp"
+            "gif" -> "image/gif"
+            "heic" -> "image/heic"
+            "heif" -> "image/heif"
+            "avif" -> "image/avif"
+            "bmp" -> "image/bmp"
+            "mov" -> "video/quicktime"
             else -> "application/octet-stream"
         }
     }

@@ -5,23 +5,7 @@ name: Pages
 #   /hazel/  the Hazel website, built from pages/hazel-pages by tools/site/build_site.py
 # Pull requests that touch the website only run the build and its checks.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'pages/**'
-      - 'tools/site/build_site.py'
-      - 'assets/Haze.svg'
-      - 'fastlane/metadata/android/en-US/images/phoneScreenshots/**'
-      - 'CHANGELOG.md'
-      - 'RELEASE-NOTES.md'
-      - 'app/build.gradle.kts'
-      - 'app/src/main/res/xml/locales_config.xml'
-      - '.github/workflows/pages.yml'
-  pull_request:
-    paths:
-      - 'pages/**'
-      - 'tools/site/build_site.py'
-      - '.github/workflows/pages.yml'
+  # Fork (Hazel Saif): upstream workflows run only by hand. See saif-release.yml.
   workflow_dispatch:
 
 permissions:

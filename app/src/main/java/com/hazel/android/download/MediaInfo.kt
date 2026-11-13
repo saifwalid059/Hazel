@@ -134,6 +134,8 @@ data class MediaInfo(
         audioCodec: AudioCodec? = null,
         videoCodec: VideoCodec? = null
     ): MediaFormat? {
+        // Hazel (Saif): a photo post has one choice, the whole post, whatever was asked for.
+        com.hazel.android.download.gallery.GalleryPosts.formatOf(this)?.let { return it }
         if (!isVideo) return bestAudioFor(audioLanguage, audioCodec)
         if (videoFormats.isEmpty()) return null
 

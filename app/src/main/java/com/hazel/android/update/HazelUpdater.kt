@@ -26,8 +26,8 @@ import java.util.concurrent.TimeUnit
  */
 object HazelUpdater {
 
-    const val REPO_NAME = "SibtainOcn/Hazel"
-    const val GITHUB_REPO_URL = "https://github.com/SibtainOcn/Hazel"
+    const val REPO_NAME = "saifwalid059/Hazel"
+    const val GITHUB_REPO_URL = "https://github.com/saifwalid059/Hazel"
     const val FDROID_PACKAGE_URL = "https://f-droid.org/packages/com.hazel.android/"
 
     @Volatile

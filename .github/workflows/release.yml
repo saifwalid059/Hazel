@@ -12,9 +12,7 @@ name: Release
 # files are named beta rather than stable.
 
 on:
-  push:
-    tags:
-      - "v*"
+  # Fork (Hazel Saif): upstream workflows run only by hand. See saif-release.yml.
   workflow_dispatch:
     inputs:
       tag:

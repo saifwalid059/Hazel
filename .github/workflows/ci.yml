@@ -14,10 +14,7 @@ name: CI
 # to main builds release, because that is the only branch a release is ever cut from.
 
 on:
-  pull_request:
-    branches: [main, nightly, "feat/**"]
-  push:
-    branches: [main]
+  # Fork (Hazel Saif): upstream workflows run only by hand. See saif-release.yml.
   workflow_dispatch:
 
 # A new push replaces the run still going for the same branch, rather than queueing behind
