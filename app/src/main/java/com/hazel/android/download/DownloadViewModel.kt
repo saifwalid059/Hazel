@@ -1702,10 +1702,13 @@ class DownloadViewModel : ViewModel() {
                         break
                     }
 
+                    // Hazel (Saif): the plan as it was carried out; a post yt-dlp could not
+                    // take is finished as gallery-dl's.
+                    var donePlan = plan
                     if (com.hazel.android.download.gallery.GalleryPosts.isGallery(plan.format)) {
                         // Hazel (Saif): every file of a photo post, through gallery-dl.
                         executeGalleryDl(app, plan, planAccess)
-                    } else try {
+                    } else try { try {
                         executeYtDlp(
                             buildRequest(
                                 plan.info.url, plan.format, options, plan.title, plan.author,
@@ -1742,6 +1745,20 @@ class DownloadViewModel : ViewModel() {
                             )
                         )
                     }
+                    } catch (e: Exception) {
+                        // Hazel (Saif): yt-dlp finds "no video" in a post that is pictures,
+                        // whatever made its card. gallery-dl is asked for the post instead,
+                        // and its reason stands if it cannot take it either.
+                        if (e is CancellationException || isCancelled || isBatchCancelled || isPaused ||
+                            restartUrl == plan.info.url ||
+                            !com.hazel.android.download.gallery.GalleryPosts.isPostLink(plan.info.url) ||
+                            !com.hazel.android.download.gallery.GalleryPosts.isNoVideoError(e.message)
+                        ) throw e
+                        purgeFragments()
+                        progressFloor = 0f
+                        donePlan = plan.copy(format = com.hazel.android.download.gallery.GalleryPosts.fallbackFormat())
+                        executeGalleryDl(app, donePlan, planAccess)
+                    }
 
                     if (restartUrl == plan.info.url && !isBatchCancelled) {
                         restartUrl = null
@@ -1770,7 +1787,7 @@ class DownloadViewModel : ViewModel() {
                         continue
                     }
 
-                    finishDownload(app, plan, options)
+                    finishDownload(app, donePlan, options)
                     markBatch(plan.info.url, BatchState.DONE)
                     downloadScope.launch {
                         com.hazel.android.data.FailedDownloadRepository.removeByUrl(app, plan.info.url)
@@ -2901,21 +2918,23 @@ class DownloadViewModel : ViewModel() {
      */
     private fun executeGalleryDl(app: Context, plan: DownloadPlan, access: SiteAccess) {
         lastNotifiedAt = 0L
+        val known = com.hazel.android.download.gallery.GalleryPosts.countOf(plan.format) > 0
         val total = com.hazel.android.download.gallery.GalleryPosts.countOf(plan.format).coerceAtLeast(1)
         _state.update { s -> s.copy(
             processingSteps = emptyList(),
             processingStep = 0,
             isProcessing = false,
             eta = "",
-            status = "Fetching $total file${if (total == 1) "" else "s"}"
+            status = if (known) "Fetching $total file${if (total == 1) "" else "s"}" else "Fetching the post"
         ) }
         galleryResult = null
         val saved = com.hazel.android.download.gallery.GalleryPosts.download(
             app, plan.info.url, downloadDir, access, processId
         ) { done ->
-            val shown = done.coerceAtMost(total)
-            val status = "File $shown of $total"
-            val fraction = (shown.toFloat() / total).coerceIn(0f, 1f)
+            val shown = if (known) done.coerceAtMost(total) else done
+            // A post taken over from yt-dlp was never counted: its files are only numbered.
+            val status = if (known) "File $shown of $total" else "File $done"
+            val fraction = if (known) (shown.toFloat() / total).coerceIn(0f, 1f) else 0f
             _state.update { s -> s.copy(progress = maxOf(s.progress, fraction), status = status) }
             val now = System.currentTimeMillis()
             if (now - lastNotifiedAt >= NOTIFICATION_INTERVAL_MS) {
@@ -2928,7 +2947,7 @@ class DownloadViewModel : ViewModel() {
                 )
             }
         }
-        galleryResult = saved to total
+        galleryResult = if (known) saved to total else null
     }
 
     /** Hazel (Saif): how many files the last post saved, of how many it held. */

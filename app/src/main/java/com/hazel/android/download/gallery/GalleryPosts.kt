@@ -104,6 +104,9 @@ object GalleryPosts {
     /** How many files the post holds, as read when its card was made. */
     fun countOf(format: MediaFormat): Int = format.formatId.substringAfter(':', "").toIntOrNull() ?: 0
 
+    /** The whole post, its files not counted: for a post handed over at download time. */
+    fun fallbackFormat(): MediaFormat = galleryFormat(0, 0, "").copy(label = "Photos")
+
     private fun galleryFormat(images: Int, videos: Int, firstExt: String): MediaFormat {
         val label = when {
             videos == 0 && images == 1 -> "Photo"
