@@ -256,7 +256,21 @@ fun FormatSheet(
 
     // The best concrete format is preselected on each tab, so the row shows what will
     // actually be downloaded rather than a placeholder.
-    val selected = if (videoTab) pickedVideo else pickedAudio
+    val baseSelected = if (videoTab) pickedVideo else pickedAudio
+
+    // Hazel (Saif): a post of pictures is downloaded whole or in the files picked from it.
+    // The picker needs what gallery-dl read, which a card from before a restart lacks; that
+    // one downloads whole.
+    val photoPost = com.hazel.android.download.gallery.GalleryPosts.isGallery(info)
+    val postItems = remember(info.url, photoPost) {
+        if (photoPost) com.hazel.android.download.gallery.GalleryPosts.previewOf(info.url)?.takeIf { it.size > 1 } else null
+    }
+    var chosenItems by remember(info.url, postItems) { mutableStateOf((1..(postItems?.size ?: 0)).toSet()) }
+    val selected = if (postItems != null) {
+        baseSelected?.takeIf { chosenItems.isNotEmpty() }?.let {
+            com.hazel.android.download.gallery.GalleryPosts.withItems(it, chosenItems, postItems.size)
+        }
+    } else baseSelected
 
     // Which soundtrack the download takes, for the few sources that publish several. Null
     // means the one the source itself leads with, which is what almost every link gets.
@@ -469,7 +483,6 @@ fun FormatSheet(
                 ) {
                     // Hazel (Saif): a post of pictures has no sound to take, and its one
                     // tab is named for what it holds.
-                    val photoPost = com.hazel.android.download.gallery.GalleryPosts.isGallery(info)
                     if (!photoPost) SheetTab(
                         label = stringResource(R.string.format_sheet_tab_audio),
                         selected = !videoTab,
@@ -533,6 +546,22 @@ fun FormatSheet(
             else stringResource(R.string.format_sheet_no_audio_stream)
             val languageName = audioLanguage?.let(::languageLabel)
                 ?.takeIf { info.audioLanguages.size > 1 }
+            if (postItems != null) {
+                // Hazel (Saif): which pictures of the post to take.
+                SheetSection(
+                    icon = Icons.Outlined.HighQuality,
+                    title = stringResource(R.string.format_sheet_tab_photos),
+                    summary = "${chosenItems.size} of ${postItems.size} chosen",
+                    expanded = qualityOpen,
+                    onToggle = { toggle(SECTION_QUALITY) }
+                ) {
+                    com.hazel.android.download.gallery.PhotoPicker(
+                        items = postItems,
+                        chosen = chosenItems,
+                        onChange = { chosenItems = it }
+                    )
+                }
+            } else {
             SheetSection(
                 icon = Icons.Outlined.HighQuality,
                 title = if (videoTab) stringResource(R.string.format_sheet_video_quality)
@@ -583,6 +612,7 @@ fun FormatSheet(
                         color = fieldColor
                     )
                 }
+            }
             }
 
             // ── Save: where it goes and in what container ──

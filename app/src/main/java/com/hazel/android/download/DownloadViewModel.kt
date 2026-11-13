@@ -2929,7 +2929,8 @@ class DownloadViewModel : ViewModel() {
         ) }
         galleryResult = null
         val saved = com.hazel.android.download.gallery.GalleryPosts.download(
-            app, plan.info.url, downloadDir, access, processId
+            app, plan.info.url, downloadDir, access, processId,
+            items = com.hazel.android.download.gallery.GalleryPosts.itemsOf(plan.format)
         ) { done ->
             val shown = if (known) done.coerceAtMost(total) else done
             // A post taken over from yt-dlp was never counted: its files are only numbered.

@@ -101,8 +101,33 @@ object GalleryPosts {
     fun isStalePost(url: String, cached: MediaInfo): Boolean =
         isPostLink(url) && !isGallery(cached) && !cached.videoFormats.any { it.hasVideo && !it.isGeneric }
 
-    /** How many files the post holds, as read when its card was made. */
-    fun countOf(format: MediaFormat): Int = format.formatId.substringAfter(':', "").toIntOrNull() ?: 0
+    /**
+     * How many files the download takes: the ones chosen, or the whole post as read when its
+     * card was made.
+     */
+    fun countOf(format: MediaFormat): Int =
+        itemsOf(format)?.split(',')?.size
+            ?: format.formatId.substringAfter(':', "").substringBefore(':').toIntOrNull() ?: 0
+
+    /**
+     * The files of the post chosen on the sheet, as gallery-dl takes them ("1,3,5"), or null
+     * for all of them. Carried in the id, after the count: `hazel-gallery:9:1,3,5`.
+     */
+    fun itemsOf(format: MediaFormat): String? =
+        format.formatId.split(':').getOrNull(2)?.takeIf { it.isNotBlank() }
+
+    /** [format] narrowed to [items] (1-based), or the whole post when they are all of it. */
+    fun withItems(format: MediaFormat, items: Collection<Int>, of: Int): MediaFormat {
+        val base = format.formatId.split(':').take(2).joinToString(":")
+        val chosen = items.filter { it in 1..of }.distinct().sorted()
+        if (chosen.isEmpty() || chosen.size == of) {
+            return format.copy(formatId = base)
+        }
+        return format.copy(
+            formatId = base + ":" + chosen.joinToString(","),
+            label = "${chosen.size} of $of"
+        )
+    }
 
     /** The whole post, its files not counted: for a post handed over at download time. */
     fun fallbackFormat(): MediaFormat = galleryFormat(0, 0, "").copy(label = "Photos")
@@ -134,7 +159,7 @@ object GalleryPosts {
 
     // ── Reading ──
 
-    private fun commonArgs(url: String, access: SiteAccess): List<String> = buildList {
+    private fun commonArgs(url: String, access: SiteAccess, items: String? = null): List<String> = buildList {
         access.cookieFile?.let {
             add("--cookies"); add(it.absolutePath)
             // gallery-dl writes updated cookies back by default; Hazel owns this file.
@@ -147,7 +172,9 @@ object GalleryPosts {
         NetworkProxy.current()?.url?.let { add("--proxy"); add(it) }
         add("-o"); add("http.timeout=30")
         // One item of a post, which the card names as a fragment on the address.
-        PostItem.indexOf(url)?.let { add("--range"); add(it.toString()) }
+        // Or the ones chosen on the sheet.
+        val range = items ?: PostItem.indexOf(url)?.toString()
+        range?.let { add("--range"); add(it) }
     }
 
     /**
@@ -300,11 +327,12 @@ object GalleryPosts {
         dir: File,
         access: SiteAccess,
         processId: String,
+        items: String? = null,
         onFile: (Int) -> Unit
     ): Int {
         dir.mkdirs()
         var done = 0
-        val args = commonArgs(url, access) + listOf(
+        val args = commonArgs(url, access, items) + listOf(
             "-D", dir.absolutePath,
             "--no-mtime",
             PostItem.address(url)
