@@ -113,7 +113,7 @@ object DownloadNotificationHelper {
         if (fileUri == null) return launchPendingIntent(context, ROUTE_HISTORY)
 
         val view = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(fileUri, if (isVideo) "video/*" else "audio/*")
+            setDataAndType(fileUri, com.hazel.android.util.MediaOpener.typeOf(context, fileUri.toString(), isVideo))
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }

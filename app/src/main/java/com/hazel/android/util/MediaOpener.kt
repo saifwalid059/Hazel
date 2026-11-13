@@ -33,7 +33,7 @@ object MediaOpener {
         }
 
         val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(Uri.parse(fileUri), if (isVideo) "video/*" else "audio/*")
+            setDataAndType(Uri.parse(fileUri), typeOf(context, fileUri, isVideo))
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -75,7 +75,7 @@ object MediaOpener {
     fun openWith(context: Context, fileUri: String, isVideo: Boolean) {
         if (fileUri.isBlank()) return toast(context, R.string.media_open_unknown_location)
         val view = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(Uri.parse(fileUri), if (isVideo) "video/*" else "audio/*")
+            setDataAndType(Uri.parse(fileUri), typeOf(context, fileUri, isVideo))
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         start(context, Intent.createChooser(view, context.getString(R.string.media_open_chooser)))
@@ -85,7 +85,7 @@ object MediaOpener {
     fun share(context: Context, fileUri: String, isVideo: Boolean) {
         if (fileUri.isBlank()) return toast(context, R.string.media_open_unknown_location)
         val send = Intent(Intent.ACTION_SEND).apply {
-            type = if (isVideo) "video/*" else "audio/*"
+            type = typeOf(context, fileUri, isVideo)
             putExtra(Intent.EXTRA_STREAM, Uri.parse(fileUri))
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
@@ -106,6 +106,20 @@ object MediaOpener {
             }.getOrNull()
         }
         if (folder != null) FolderUtil.openTree(context, folder) else openLocation(context, "", isVideo)
+    }
+
+    /**
+     * The type to open [fileUri] as. Hazel (Saif): a photo from a post is a picture, and a
+     * video player handed one fails; what the system records for the file decides, and only
+     * a video or a sound keeps the wildcard that leaves the choice of player wide.
+     */
+    fun typeOf(context: Context, fileUri: String, isVideo: Boolean): String {
+        val recorded = runCatching { context.contentResolver.getType(Uri.parse(fileUri)) }.getOrNull()
+            ?: android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(
+                fileUri.substringBefore('?').substringAfterLast('.', "").lowercase()
+            )
+        return if (recorded != null && recorded.startsWith("image/")) recorded
+        else if (isVideo) "video/*" else "audio/*"
     }
 
     private fun start(context: Context, intent: Intent) {
